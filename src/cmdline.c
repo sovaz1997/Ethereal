@@ -20,8 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bitboards.h"
 #include "board.h"
 #include "cmdline.h"
+#include "evaluate.h"
 #include "move.h"
 #include "search.h"
 #include "thread.h"
@@ -36,6 +38,12 @@ void handleCommandLine(int argc, char **argv) {
     // USAGE: ./Ethereal bench <depth> <threads> <hash>
     if (argc > 1 && strEquals(argv[1], "bench")) {
         runBenchmark(argc, argv);
+        exit(EXIT_SUCCESS);
+    }
+
+    //
+    if (argc > 1 && strEquals(argv[1], "filter")) {
+        filterBook(argv[2]);
         exit(EXIT_SUCCESS);
     }
 
@@ -154,4 +162,38 @@ void runEvalBook(int argc, char **argv) {
     }
 
     printf("Time %dms\n", (int)(getRealTime() - start));
+}
+
+void filterBook(char *fname) {
+
+    char line[256];
+    FILE *fin = fopen(fname, "r");
+
+    Thread *thread = createThreadPool(1);
+    Board *board   = &thread->board;
+
+    while (1) {
+
+        if (fgets(line, 256, fin) == NULL)
+            break;
+
+        boardFromFEN(board, line, 0);
+
+        // Remove all in-check positions
+        if (board->kingAttackers)
+            continue;
+
+        // Remove all Tablebase positions
+        if (popcount(board->colours[WHITE] | board->colours[BLACK]) <= 6)
+            continue;
+
+        // Remove positions where qs and eval differ by 25cp
+        int ev = evaluateBoard(thread, board);
+        int qs = qsearch(thread, &thread->pv, -MATE, MATE);
+        if (abs(ev - qs) > 25) continue;
+
+        printf("%s", line);
+    }
+
+    free(thread);
 }
