@@ -47,6 +47,12 @@ void handleCommandLine(int argc, char **argv) {
         exit(EXIT_SUCCESS);
     }
 
+    //
+    if (argc > 1 && strEquals(argv[1], "nnbook")) {
+        buildNNBook(argv[2]);
+        exit(EXIT_SUCCESS);
+    }
+
     // Bench is being run from the command line
     // USAGE: ./Ethereal evalbook <book> <depth> <threads> <hash>
     if (argc > 2 && strEquals(argv[1], "evalbook")) {
@@ -187,12 +193,68 @@ void filterBook(char *fname) {
         if (popcount(board->colours[WHITE] | board->colours[BLACK]) <= 6)
             continue;
 
-        // Remove positions where qs and eval differ by 25cp
+        // Remove positions where qs and eval differ
         int ev = evaluateBoard(thread, board);
         int qs = qsearch(thread, &thread->pv, -MATE, MATE);
-        if (abs(ev - qs) > 25) continue;
+        if (ev != qs) continue;
 
         printf("%s", line);
+    }
+
+    free(thread);
+}
+
+void buildNNBook(char *fname) {
+
+    char line[256];
+    FILE *fin = fopen(fname, "r");
+
+    Thread *thread = createThreadPool(1);
+    Board *board   = &thread->board;
+
+    while (1) {
+
+        if (fgets(line, 256, fin) == NULL)
+            break;
+
+        boardFromFEN(board, line, 0);
+
+        for (int colour = WHITE; colour <= BLACK; colour++) {
+
+            uint64_t ours = board->colours[colour] & board->pieces[PAWN];
+
+            for (int sq = 0; sq < SQUARE_NB; sq++)
+                if (!testBit(PROMOTION_RANKS, sq))
+                    printf("%d ", testBit(ours, sq));
+        }
+
+        for (int colour = WHITE; colour <= BLACK; colour++) {
+
+            uint64_t ours = board->colours[colour] & board->pieces[KING];
+
+            for (int sq = 0; sq < SQUARE_NB; sq++)
+                printf("%d ", testBit(ours, sq));
+        }
+
+        for (int colour = WHITE; colour <= BLACK; colour++) {
+
+            uint64_t ours = board->colours[colour] & board->pieces[ROOK];
+
+            for (int sq = 0; sq < SQUARE_NB; sq++)
+                printf("%d ", testBit(ours, sq));
+        }
+
+        // Fetch the stored WDL result
+        if      (strstr(line, "[1.0]")) printf("1.0 ");
+        else if (strstr(line, "[0.0]")) printf("0.0 ");
+        else if (strstr(line, "[0.5]")) printf("0.5 ");
+        else if (strstr(line,   "1-0")) printf("1.0 ");
+        else if (strstr(line,   "0-1")) printf("0.0 ");
+        else if (strstr(line,  "1/2-")) printf("0.5 ");
+        else { printf("Error"); break; }
+
+        // print <mg> <eg> <phase> <factor> <turn>
+        evaluateBoard(thread, board);
     }
 
     free(thread);

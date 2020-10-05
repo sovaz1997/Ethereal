@@ -444,12 +444,12 @@ int evaluateBoard(Thread *thread, Board *board) {
     int phase, factor, eval, pkeval, hashed;
 
     // We can recognize positions we just evaluated
-    if (thread->moveStack[thread->height-1] == NULL_MOVE)
-        return -thread->evalStack[thread->height-1] + 2 * Tempo;
-
-    // Check for this evaluation being cached already
-    if (!TRACE && getCachedEvaluation(thread, board, &hashed))
-        return hashed;
+    // if (thread->moveStack[thread->height-1] == NULL_MOVE)
+    //     return -thread->evalStack[thread->height-1] + 2 * Tempo;
+    //
+    // // Check for this evaluation being cached already
+    // if (!TRACE && getCachedEvaluation(thread, board, &hashed))
+    //     return hashed;
 
     initEvalInfo(thread, board, &ei);
     eval = evaluatePieces(&ei, board);
@@ -467,11 +467,14 @@ int evaluateBoard(Thread *thread, Board *board) {
                - 2 * popcount(board->pieces[ROOK  ])
                - 1 * popcount(board->pieces[KNIGHT]
                              |board->pieces[BISHOP]);
-    phase = (phase * 256 + 12) / 24;
+    // phase = (phase * 256 + 12) / 24;
 
     // Scale evaluation based on remaining material
     factor = evaluateScaleFactor(board, eval);
     if (TRACE) T.factor = factor;
+
+    printf("%d %d %d %d %d\n", ScoreMG(eval), ScoreEG(eval), phase, factor, board->turn);
+    return 0;
 
     // Compute and store an interpolated evaluation from white's POV
     eval = (ScoreMG(eval) * (256 - phase)
