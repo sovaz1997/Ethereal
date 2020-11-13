@@ -219,42 +219,23 @@ void buildNNBook(char *fname) {
 
         boardFromFEN(board, line, 0);
 
-        for (int colour = WHITE; colour <= BLACK; colour++) {
+        char *tail = strstr(line, "] ");
 
-            uint64_t ours = board->colours[colour] & board->pieces[PAWN];
+        printf("%d %d %d %d",
+            atoi(tail + strlen("] ")), board->turn,
+            getlsb(board->pieces[KING] & board->colours[WHITE]),
+            getlsb(board->pieces[KING] & board->colours[BLACK]));
 
-            for (int sq = 0; sq < SQUARE_NB; sq++)
-                if (!testBit(PROMOTION_RANKS, sq))
-                    printf("%d ", testBit(ours, sq));
+        uint64_t pieces = board->colours[WHITE] | board->colours[BLACK];
+
+        while (pieces) {
+            int sq = poplsb(&pieces);
+            int pt = pieceType(board->squares[sq]);
+            int c  = pieceColour(board->squares[sq]);
+            if (pt != KING) printf(" %d", 64 * ((5 * c) + pt) + sq);
         }
 
-        for (int colour = WHITE; colour <= BLACK; colour++) {
-
-            uint64_t ours = board->colours[colour] & board->pieces[KING];
-
-            for (int sq = 0; sq < SQUARE_NB; sq++)
-                printf("%d ", testBit(ours, sq));
-        }
-
-        for (int colour = WHITE; colour <= BLACK; colour++) {
-
-            uint64_t ours = board->colours[colour] & board->pieces[ROOK];
-
-            for (int sq = 0; sq < SQUARE_NB; sq++)
-                printf("%d ", testBit(ours, sq));
-        }
-
-        // Fetch the stored WDL result
-        if      (strstr(line, "[1.0]")) printf("1.0 ");
-        else if (strstr(line, "[0.0]")) printf("0.0 ");
-        else if (strstr(line, "[0.5]")) printf("0.5 ");
-        else if (strstr(line,   "1-0")) printf("1.0 ");
-        else if (strstr(line,   "0-1")) printf("0.0 ");
-        else if (strstr(line,  "1/2-")) printf("0.5 ");
-        else { printf("Error"); break; }
-
-        // print <mg> <eg> <phase> <factor> <turn>
-        evaluateBoard(thread, board);
+        printf("\n");
     }
 
     free(thread);

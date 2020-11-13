@@ -468,14 +468,14 @@ int evaluateBoard(Thread *thread, Board *board) {
                - 2 * popcount(board->pieces[ROOK  ])
                - 1 * popcount(board->pieces[KNIGHT]
                              |board->pieces[BISHOP]);
-    // phase = (phase * 256 + 12) / 24;
+    phase = (phase * 256 + 12) / 24;
 
     // Scale evaluation based on remaining material
     factor = evaluateScaleFactor(board, eval);
     if (TRACE) T.factor = factor;
 
-    printf("%d %d %d %d %d\n", ScoreMG(eval), ScoreEG(eval), phase, factor, board->turn);
-    return 0;
+    // printf("%d %d %d %d %d\n", ScoreMG(eval), ScoreEG(eval), phase, factor, board->turn);
+    // return 0;
 
     // Compute and store an interpolated evaluation from white's POV
     eval = (ScoreMG(eval) * (256 - phase)
