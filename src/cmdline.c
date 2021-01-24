@@ -206,37 +206,57 @@ void filterBook(char *fname) {
 
 void buildNNBook(char *fname) {
 
+    #define encode_piece(p) (8 * pieceColour(p) + pieceType(p))
+    #define pack_pieces(p1, p2) (((p1) << 4) | (p2))
+
     char line[256];
     FILE *fin = fopen(fname, "r");
+    FILE *fout = fopen("output.nnbook", "wb");
 
     Thread *thread = createThreadPool(1);
     Board *board   = &thread->board;
 
-    while (1) {
-
-        if (fgets(line, 256, fin) == NULL)
-            break;
+    while (fgets(line, 256, fin) != NULL) {
 
         boardFromFEN(board, line, 0);
 
-        char *tail = strstr(line, "] ");
+        char *tail   = strstr(line, "] ");
+        int16_t eval = atoi(tail + strlen("] "));
+        int8_t turn  = board->turn;
 
-        printf("%d %d %d %d",
-            atoi(tail + strlen("] ")), board->turn,
-            getlsb(board->pieces[KING] & board->colours[WHITE]),
-            getlsb(board->pieces[KING] & board->colours[BLACK]));
+        uint64_t white  = board->colours[WHITE];
+        uint64_t black  = board->colours[BLACK];
+        uint64_t pieces = white | black;
 
-        uint64_t pieces = board->colours[WHITE] | board->colours[BLACK];
+        uint8_t count = popcount(pieces);
+        uint8_t wksq  = getlsb(white & board->pieces[KING]);
+        uint8_t bksq  = getlsb(black & board->pieces[KING]);
 
-        while (pieces) {
+        uint8_t types[32] = {0};
+        uint8_t packed[16] = {0};
+
+        fwrite(&pieces, sizeof(uint64_t), 1, fout);
+        fwrite(&eval,   sizeof(int16_t ), 1, fout);
+        fwrite(&turn,   sizeof(uint8_t ), 1, fout);
+        fwrite(&wksq,   sizeof(uint8_t ), 1, fout);
+        fwrite(&bksq,   sizeof(uint8_t ), 1, fout);
+        fwrite(&count,  sizeof(uint8_t ), 1, fout);
+
+        for (int i = 0; pieces; i++) {
             int sq = poplsb(&pieces);
-            int pt = pieceType(board->squares[sq]);
-            int c  = pieceColour(board->squares[sq]);
-            if (pt != KING) printf(" %d", 64 * ((5 * c) + pt) + sq);
+            types[i] = encode_piece(board->squares[sq]);
         }
 
-        printf("\n");
+        for (int i = 0; i < 16; i++)
+            packed[i] = pack_pieces(types[i*2], types[i*2+1]);
+
+        fwrite(packed, sizeof(uint8_t), (count + 1) / 2, fout);
     }
 
+    fclose(fin);
+    fclose(fout);
     free(thread);
+
+    #undef encode_piece
+    #undef pack_pieces
 }
