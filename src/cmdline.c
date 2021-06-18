@@ -235,8 +235,14 @@ void buildNNBook(char *fname) {
         uint8_t types[32] = {0};
         uint8_t packed[16] = {0};
 
+        uint8_t result;
+        if (strstr(line, "[0.0]")) result = 0u;
+        if (strstr(line, "[0.5]")) result = 1u;
+        if (strstr(line, "[1.0]")) result = 2u;
+
         fwrite(&pieces, sizeof(uint64_t), 1, fout);
         fwrite(&eval,   sizeof(int16_t ), 1, fout);
+        fwrite(&result, sizeof(uint8_t ), 1, fout);
         fwrite(&turn,   sizeof(uint8_t ), 1, fout);
         fwrite(&wksq,   sizeof(uint8_t ), 1, fout);
         fwrite(&bksq,   sizeof(uint8_t ), 1, fout);
