@@ -250,6 +250,8 @@ static void buildHalfKPBook(int argc, char **argv) {
         sample.eval   = sample.turn ? -sample.eval : sample.eval;
         sample.result = sample.turn ? 2u - sample.result : sample.result;
 
+        if (sample.eval > 1000 || sample.eval < -1000) continue;
+
         fwrite(&sample, sizeof(HalfKPSample), 1, fout);
 
         if (positions++ % (1024 * 1024) == 0) {

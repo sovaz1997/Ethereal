@@ -282,7 +282,9 @@ static void pgn_read_moves(FILE *pgn, PGNData *data, Board *board) {
         // Read and Apply the next move if there is one
         index = pgn_read_until_move(data->buffer, index);
         if (data->buffer[index] == '\0') return;
-        applyMove(board, parse_san(board, data->buffer + index), &undo);
+ 
+        uint16_t move = parse_san(board, data->buffer + index);
+        // applyMove(board, parse_san(board, data->buffer + index), &undo);
 
         // Assume that each move has an associated comment
         index = pgn_read_until_begin_comment(data->buffer, index);
@@ -297,15 +299,19 @@ static void pgn_read_moves(FILE *pgn, PGNData *data, Board *board) {
             eval = data->buffer[index] == '+' ? MATE - plies : -MATE + plies;
         }
 
-        // Use White POV ( We applied one move )
-        if (board->turn == WHITE) eval = -eval;
+        // Use White POV
+        if (board->turn == BLACK) eval = -eval;
 
         // Skip head to the end of this comment to prepare for the next Move
         index = pgn_read_until_end_comment(data->buffer, index); data->plies++;
 
         // Ethereal NNUE data formatting to build FENs
-        boardToFEN(board, fen);
-        printf("%s [%s] %d\n", fen, lookup[data->result], eval);
+        if (-1000 <= eval && eval <= 1000) {
+            boardToFEN(board, fen);
+            printf("%s [%s] %d\n", fen, lookup[data->result], eval);
+        }
+
+        applyMove(board, move, &undo);
     }
 }
 
