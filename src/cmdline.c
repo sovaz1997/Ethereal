@@ -17,14 +17,19 @@
 */
 
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "bitboards.h"
 #include "board.h"
 #include "cmdline.h"
+#include "evaluate.h"
 #include "move.h"
+#include "movegen.h"
+#include "nnue/nnue.h"
 #include "pgn.h"
 #include "search.h"
 #include "thread.h"
@@ -33,7 +38,7 @@
 #include "tuner.h"
 #include "uci.h"
 
-#include "nnue/nnue.h"
+extern volatile int DISABLE_UCI_OUTPUT;
 
 typedef struct PSQBBSample {
     uint64_t occupied;   // 8-byte occupancy bitboard ( All Pieces )
@@ -70,6 +75,44 @@ static void packBitboard(uint8_t *packed, Board* board, uint64_t pieces) {
 
     #undef encode_piece
     #undef pack_pieces
+}
+
+
+static void randomize_opening(Board *board, int booklen) {
+
+    Undo undo;
+    int nmoves;
+    uint16_t moves[MAX_MOVES];
+
+    // Init the board with a fresh state from the starting position
+    boardFromFEN(board, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 0);
+
+    // Apply each book move an ensure we don't reach a checkmate
+    for (int i = 0; i < booklen; i++) {
+        nmoves = genAllLegalMoves(board, moves);
+        if (nmoves) applyMove(board, moves[rand() % nmoves], &undo);
+        else { randomize_opening(board, booklen); return; };
+    }
+
+    // Abort and retry if we reached a checkmate
+    if (!genAllLegalMoves(board, moves))
+        randomize_opening(board, booklen);
+}
+
+static int search_to_depth(Thread *thread, Board *board) {
+    UCIGoStruct ucigo = { 1, "go depth 9\n", board, thread };
+    uciGo((void*) &ucigo);
+    return thread->pvs[thread->completed].score;
+}
+
+static bool position_is_terminal(Board *board, int plies) {
+    uint16_t moves[MAX_MOVES];
+    return !genAllLegalMoves(board, moves) || boardIsDrawn(board, plies);
+}
+
+static bool position_is_checkmate(Board *board) {
+    uint16_t moves[MAX_MOVES];
+    return board->kingAttackers && !genAllLegalMoves(board, moves);
 }
 
 
@@ -266,6 +309,58 @@ static void buildHalfKPBook(int argc, char **argv) {
     fclose(fout);
 }
 
+static void generate_fens(int argc, char **argv) {
+
+    enum Result { LOSS, DRAW, WIN };
+    const int Booklen = 10, Cutoff = 1000;
+    const char *Labels[3] = { "[0.0]", "[0.5]", "[1.0]" };
+
+    FILE* fout      = fopen(argv[2], "w");
+    const int depth = argc > 3 ? atoi(argv[3]) : 9;
+    const int games = argc > 4 ? atoi(argv[4]) : 10000;
+
+    Board board;
+    Thread *thread = createThreadPool(1);
+    int *evals = malloc(sizeof(int) * 8192);
+    char *fens = malloc(sizeof(char) * 8192 * 128);
+
+    DISABLE_UCI_OUTPUT = 1;
+    srand(argv > 5 ? argv[5] : time(NULL));
+
+    for (int game = 0; game < games; game++) {
+
+        int result = DRAW, ply = 0;
+
+        do { randomize_opening(&board, Booklen); }
+        while (abs(search_to_depth(thread, &board)) > Cutoff);
+
+        while (!position_is_terminal(&board, ply) && ply < 8192) {
+            search_to_depth(thread, &board);
+            evals[ply] = (board.turn == WHITE ? 1 : -1) * thread->pvs[depth].score;
+            apply(thread, &board, thread->pvs[depth].line[0]);
+            boardToFEN(&board, &fens[ply * 128]);
+            if (abs(evals[ply++]) > Cutoff) break;
+        }
+
+        if (evals[ply-1] > Cutoff) result = WIN;
+        if (evals[ply-1] < Cutoff) result = LOSS;
+        if (position_is_checkmate(&board))
+            result = (board.turn == WHITE) ? LOSS : WIN;
+
+        for (int i = 0; i < ply; i++)
+            fprintf(fout, "%s %s %d\n", &fens[128 * i], Labels[result], evals[i]);
+
+        if (game % 128 == 0)
+            printf("Finished %d of %d\r", game, games);
+    }
+
+    printf("Finished %d of %d\r", games, games);
+
+    free(evals);
+    free(fens);
+    fclose(fout);
+}
+
 
 void handleCommandLine(int argc, char **argv) {
 
@@ -285,6 +380,8 @@ void handleCommandLine(int argc, char **argv) {
         printf("\n            Build an FEN file to be processed later by Ethereal's psqbb or halfkp");
         printf("\n            Format: [FEN] [RESULT] [EVAL]. Result = { [0.0], [0.5], [1.0] }\n");
         exit(EXIT_SUCCESS);
+
+        // ./Ethereal genfens <output> <depth> <games>
     }
 
     // Benchmark is being run from the command line
@@ -319,6 +416,13 @@ void handleCommandLine(int argc, char **argv) {
     // USAGE: ./Ethereal pgnfen <input>
     if (argc > 2 && strEquals(argv[1], "pgnfen")) {
         process_pgn(argv[2]);
+        exit(EXIT_SUCCESS);
+    }
+
+    // Perform self-play games and generate output a list of FENs
+    // USAGE: ./Ethereal genfens <output> <depth> <games> <seed>
+    if (argc > 2 && strEquals(argv[1], "genfens")) {
+        generate_fens(argc, argv);
         exit(EXIT_SUCCESS);
     }
 

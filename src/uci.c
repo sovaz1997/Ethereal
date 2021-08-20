@@ -49,6 +49,7 @@ extern volatile int IS_PONDERING; // Defined by search.c
 extern volatile int ANALYSISMODE; // Defined by search.c
 extern PKNetwork PKNN;            // Defined by network.c
 
+volatile int DISABLE_UCI_OUTPUT = 0;
 pthread_mutex_t PONDERLOCK = PTHREAD_MUTEX_INITIALIZER;
 const char *StartPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -237,6 +238,8 @@ void *uciGo(void *cargo) {
     // UCI spec does not want reports until out of pondering
     while (IS_PONDERING);
 
+    if (DISABLE_UCI_OUTPUT) return NULL;
+
     // Report best move ( we should always have one )
     moveToString(bestMove, moveStr, board->chess960);
     printf("bestmove %s ", moveStr);
@@ -377,6 +380,8 @@ void uciReport(Thread *threads, PVariation *pv, int alpha, int beta, int value) 
     // interested in. Also, bound the value passed by alpha and
     // beta, since Ethereal uses a mix of fail-hard and fail-soft
 
+    if (DISABLE_UCI_OUTPUT) return;
+
     int hashfull    = hashfullTT();
     int depth       = threads->depth;
     int seldepth    = threads->seldepth;
@@ -414,6 +419,8 @@ void uciReport(Thread *threads, PVariation *pv, int alpha, int beta, int value) 
 }
 
 void uciReportCurrentMove(Board *board, uint16_t move, int currmove, int depth) {
+
+    if (DISABLE_UCI_OUTPUT) return;
 
     char moveStr[6];
     moveToString(move, moveStr, board->chess960);
