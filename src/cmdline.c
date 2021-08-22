@@ -105,9 +105,9 @@ static int search_to_depth(Thread *thread, Board *board) {
     return thread->pvs[thread->completed].score;
 }
 
-static bool position_is_terminal(Board *board, int plies) {
+static bool position_is_terminal(Board *board) {
     uint16_t moves[MAX_MOVES];
-    return !genAllLegalMoves(board, moves) || boardIsDrawn(board, plies);
+    return !genAllLegalMoves(board, moves) || boardIsDrawn(board, 0);
 }
 
 static bool position_is_checkmate(Board *board) {
@@ -325,36 +325,46 @@ static void generate_fens(int argc, char **argv) {
     char *fens = malloc(sizeof(char) * 8192 * 128);
 
     DISABLE_UCI_OUTPUT = 1;
-    srand(argv > 5 ? argv[5] : time(NULL));
+    srand((argc > 5) ? (unsigned) atoi(argv[5]) : time(NULL));
 
     for (int game = 0; game < games; game++) {
 
+        // Result is drawn unless otherwise determined
         int result = DRAW, ply = 0;
 
-        do { randomize_opening(&board, Booklen); }
-        while (abs(search_to_depth(thread, &board)) > Cutoff);
+        // Randomize an opening and exhaust a game
+        randomize_opening(&board, Booklen);
+        while (!position_is_terminal(&board) && ply < 8192) {
 
-        while (!position_is_terminal(&board, ply) && ply < 8192) {
+            // Fill thread->pvs[depth]
             search_to_depth(thread, &board);
-            evals[ply] = (board.turn == WHITE ? 1 : -1) * thread->pvs[depth].score;
-            apply(thread, &board, thread->pvs[depth].line[0]);
+
+            // Save the FEN and a White POV Search
             boardToFEN(&board, &fens[ply * 128]);
-            if (abs(evals[ply++]) > Cutoff) break;
+            evals[ply] = thread->pvs[depth].score;
+            if (board.turn == BLACK) evals[ply] = -evals[ply];
+
+            // Apply the PV move and terminate on check adjudication
+            apply(thread, &board, thread->pvs[depth].line[0]);
+            if (abs(evals[ply++]) >= Cutoff) break;
+
+            // Reset the full-move counter on zeroing moves
+            if (board.halfMoveCounter == 0) board.numMoves = 0;
         }
 
-        if (evals[ply-1] > Cutoff) result = WIN;
-        if (evals[ply-1] < Cutoff) result = LOSS;
+        // Result defined via Adjudication
+        if (abs(evals[ply-1]) >= Cutoff)
+            result = (evals[ply-1] >= Cutoff) ? WIN : LOSS;
+
+        // Checkmate reached OTB
         if (position_is_checkmate(&board))
             result = (board.turn == WHITE) ? LOSS : WIN;
 
+        // Write all positions inside [-Cutoff, Cutoff]
         for (int i = 0; i < ply; i++)
-            fprintf(fout, "%s %s %d\n", &fens[128 * i], Labels[result], evals[i]);
-
-        if (game % 128 == 0)
-            printf("Finished %d of %d\r", game, games);
+            if (abs(evals[i]) < Cutoff)
+                fprintf(fout, "%s %s %d\n", &fens[128 * i], Labels[result], evals[i]);
     }
-
-    printf("Finished %d of %d\r", games, games);
 
     free(evals);
     free(fens);
