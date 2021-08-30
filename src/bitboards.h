@@ -58,6 +58,7 @@ enum {
 extern const uint64_t Files[FILE_NB];
 extern const uint64_t Ranks[RANK_NB];
 
+void initBitBoards();
 int fileOf(int sq);
 int mirrorFile(int file);
 int rankOf(int sq);

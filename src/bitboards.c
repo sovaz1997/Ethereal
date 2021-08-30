@@ -23,48 +23,70 @@
 
 #include "bitboards.h"
 #include "types.h"
+#include "masks.h"
 
 const uint64_t Files[FILE_NB] = {FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H};
 const uint64_t Ranks[RANK_NB] = {RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8};
 
-int fileOf(int sq) {
-    assert(0 <= sq && sq < SQUARE_NB);
-    return sq % FILE_NB;
+void initBitBoards() {
+    for (int sq = 0; sq < SQUARE_NB; sq++) {
+        RankOf[sq] = sq / FILE_NB;
+        FileOf[sq] = sq % FILE_NB;
+    }
+
+    for (int r = 0; r < RANK_NB; r++) {
+        for (int f = 0; f < FILE_NB; f++) {
+            Square[r][f] = r * FILE_NB + f;
+        }
+    }
+
+    for (int colour = 0; colour < COLOUR_NB; colour++) {
+        for (int sq = 0; sq < SQUARE_NB; sq++) {
+            RelativeRankOf[colour][sq] = (colour == WHITE ? RankOf[sq] : 7 - RankOf[sq]);
+            RelativeSquare[colour][sq] = Square[RelativeRankOf[colour][sq]][FileOf[sq]];
+            RelativeSquare32[colour][sq] = 4 * RelativeRankOf[colour][sq] + mirrorFile(FileOf[sq]);
+        }
+    }
 }
 
-int mirrorFile(int file) {
+inline int fileOf(int sq) {
+    assert(0 <= sq && sq < SQUARE_NB);
+    return FileOf[sq];
+}
+
+inline int mirrorFile(int file) {
     static const int Mirror[] = {0,1,2,3,3,2,1,0};
     assert(0 <= file && file < FILE_NB);
     return Mirror[file];
 }
 
-int rankOf(int sq) {
+inline int rankOf(int sq) {
     assert(0 <= sq && sq < SQUARE_NB);
-    return sq / FILE_NB;
+    return RankOf[sq];
 }
 
-int relativeRankOf(int colour, int sq) {
+inline int relativeRankOf(int colour, int sq) {
     assert(0 <= colour && colour < COLOUR_NB);
     assert(0 <= sq && sq < SQUARE_NB);
-    return colour == WHITE ? rankOf(sq) : 7 - rankOf(sq);
+    return RelativeRankOf[colour][sq];
 }
 
-int square(int rank, int file) {
+inline int square(int rank, int file) {
     assert(0 <= rank && rank < RANK_NB);
     assert(0 <= file && file < FILE_NB);
-    return rank * FILE_NB + file;
+    return Square[rank][file];
 }
 
-int relativeSquare(int colour, int sq) {
+inline int relativeSquare(int colour, int sq) {
     assert(0 <= colour && colour < COLOUR_NB);
     assert(0 <= sq && sq < SQUARE_NB);
-    return square(relativeRankOf(colour, sq), fileOf(sq));
+    return RelativeSquare[colour][sq];
 }
 
-int relativeSquare32(int colour, int sq) {
+inline int relativeSquare32(int colour, int sq) {
     assert(0 <= colour && colour < COLOUR_NB);
     assert(0 <= sq && sq < SQUARE_NB);
-    return 4 * relativeRankOf(colour, sq) + mirrorFile(fileOf(sq));
+    return RelativeSquare32[colour][sq];
 }
 
 uint64_t squaresOfMatchingColour(int sq) {

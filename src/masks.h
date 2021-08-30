@@ -36,3 +36,10 @@ uint64_t passedPawnMasks(int colour, int sq);
 uint64_t pawnConnectedMasks(int colour, int sq);
 uint64_t outpostSquareMasks(int colour, int sq);
 uint64_t outpostRanksMasks(int colour);
+
+int RankOf[SQUARE_NB];
+int FileOf[SQUARE_NB];
+int Square[RANK_NB][FILE_NB];
+int RelativeRankOf[COLOUR_NB][SQUARE_NB];
+int RelativeSquare[COLOUR_NB][SQUARE_NB];
+int RelativeSquare32[COLOUR_NB][SQUARE_NB];

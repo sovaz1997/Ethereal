@@ -41,6 +41,7 @@
 #include "types.h"
 #include "uci.h"
 #include "zobrist.h"
+#include "bitboards.h"
 
 extern int MoveOverhead;          // Defined by time.c
 extern unsigned TB_PROBE_DEPTH;   // Defined by syzygy.c
@@ -64,8 +65,8 @@ int main(int argc, char **argv) {
     int multiPV  = 1;
 
     // Initialize core components of Ethereal
-    initAttacks(); initMasks(); initEval();
-    initSearch(); initZobrist(); init_TT(16);
+    initBitBoards(); initAttacks(); initMasks();
+    initEval(); initSearch(); initZobrist(); init_TT(16);
     initPKNetwork(&PKNN); nnue_incbin_init();
 
     // Create the UCI-board and our threads

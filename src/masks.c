@@ -38,7 +38,6 @@ uint64_t OutpostSquareMasks[COLOUR_NB][SQUARE_NB];
 uint64_t OutpostRanksMasks[COLOUR_NB];
 
 void initMasks() {
-
     // Init a table for the distance between two given squares
     for (int sq1 = 0; sq1 < SQUARE_NB; sq1++)
         for (int sq2 = 0; sq2 < SQUARE_NB; sq2++)
@@ -135,6 +134,8 @@ void initMasks() {
         PawnConnectedMasks[WHITE][sq] = pawnAttacks(BLACK, sq) | pawnAttacks(BLACK, sq + 8);
         PawnConnectedMasks[BLACK][sq] = pawnAttacks(WHITE, sq) | pawnAttacks(WHITE, sq - 8);
     }
+
+
 }
 
 int distanceBetween(int s1, int s2) {
